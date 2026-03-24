@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc, Timestamp, writeBatch, increment } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Purchase, PurchaseLineItem, Supplier, Location, InventoryBatch } from '../types';
 import { useAuth } from '../AuthContext';
+import { uploadFile } from '../uploadHelper';
 
 export const Purchases: React.FC = () => {
   const { profile } = useAuth();
@@ -26,6 +27,9 @@ export const Purchases: React.FC = () => {
   const [hasWitness, setHasWitness] = useState(false);
   const [witnessName, setWitnessName] = useState('');
   
+  const [declFile, setDeclFile] = useState<File | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+
   // Form Lines State
   const [lineItems, setLineItems] = useState<PurchaseLineItem[]>([]);
 
@@ -76,8 +80,8 @@ export const Purchases: React.FC = () => {
     if (!supplier) return alert('Invalid supplier');
 
     if (supplier.identityStatus === 'pending') {
-      if (!hasDeclarationLetter) {
-        return alert('Cannot finalize no-ID fisherman purchase without enhanced evidence (Declaration Letter).');
+      if (!hasDeclarationLetter || !hasWitness || !photoFile || !declFile) {
+        return alert('Cannot finalize no-ID fisherman purchase without full enhanced evidence (Declaration Upload, Witness, Photo Upload).');
       }
     }
 
@@ -86,7 +90,17 @@ export const Purchases: React.FC = () => {
 
     try {
       setLoading(true);
-      const batch = writeBatch(db);
+      
+      let declUrl = '';
+      if (declFile) {
+         declUrl = await uploadFile(declFile, 'declarations');
+      }
+      let photoUrl = '';
+      if (photoFile) {
+         photoUrl = await uploadFile(photoFile, 'purchases');
+      }
+
+      const batchOp = writeBatch(db);
       const batchIdStr = `BATCH-${loc.siteCode}-${Date.now()}`;
       
       const newPurchaseRef = doc(collection(db, 'purchases'));
@@ -113,7 +127,7 @@ export const Purchases: React.FC = () => {
           status: 'active',
           createdAt: new Date().toISOString()
         };
-        batch.set(invRef, invBatch);
+        batchOp.set(invRef, invBatch);
         batchLinks.push(invBatch.batchId);
       }
 
@@ -130,12 +144,14 @@ export const Purchases: React.FC = () => {
         batchId: batchLinks.join(','),
         receivingOfficerId: profile?.uid || 'Unknown',
         weighedBy: profile?.uid || 'Unknown',
-        hasPhoto: false,
+        hasPhoto: !!photoUrl,
+        photoRef: photoUrl || undefined,
         paymentMethod,
         paymentStatus: 'pending',
         notes,
         escalationFlag: false,
-        hasDeclarationLetter,
+        hasDeclarationLetter: !!declUrl,
+        declarationRef: declUrl || undefined,
         hasWitness,
         witnessName,
         hasThumbprint: false,
@@ -145,8 +161,8 @@ export const Purchases: React.FC = () => {
         createdBy: profile?.uid || 'Unknown'
       };
 
-      batch.set(newPurchaseRef, purchase);
-      await batch.commit();
+      batchOp.set(newPurchaseRef, purchase);
+      await batchOp.commit();
 
       setShowForm(false);
       fetchDependencies();
@@ -202,19 +218,24 @@ export const Purchases: React.FC = () => {
                 <option value="transfer">Bank Transfer</option>
               </select>
             </div>
+            <div className="form-group">
+              <label className="form-label">Transaction Photo Upload</label>
+              <input type="file" className="glass-input" onChange={e => setPhotoFile(e.target.files ? e.target.files[0] : null)} />
+            </div>
           </div>
 
           {selectedSupplier?.identityStatus === 'pending' && (
             <div style={{ marginTop: '16px', padding: '16px', border: '1px solid var(--warning-color)', borderRadius: '8px' }}>
               <h4 style={{ color: 'var(--warning-color)' }}>Authentication Escalation: Temporary ID / No NIK</h4>
               <p style={{ fontSize: '0.875rem', marginBottom: '12px' }}>
-                This supplier is missing permanent tax identification. You MUST collect a signed declaration to proceed.
+                This supplier is missing permanent tax identification. You MUST collect a signed declaration and witness to proceed.
               </p>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input type="checkbox" checked={hasDeclarationLetter} onChange={e => setHasDeclarationLetter(e.target.checked)} />
-                  Declaration Letter Collected
+                  Declaration Check
                 </label>
+                <input type="file" className="glass-input" style={{ width: 'auto' }} onChange={e => setDeclFile(e.target.files ? e.target.files[0] : null)} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input type="checkbox" checked={hasWitness} onChange={e => setHasWitness(e.target.checked)} />
                   Witness Present
@@ -232,20 +253,32 @@ export const Purchases: React.FC = () => {
           <h3 style={{ marginTop: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Line Items</h3>
           <div style={{ marginTop: '16px' }}>
             {lineItems.map((line, i) => (
-              <div key={line.id} className="grid-4" style={{ marginBottom: '16px', alignItems: 'flex-end' }}>
+              <div key={line.id} className="grid-4" style={{ marginBottom: '16px', alignItems: 'flex-end', borderBottom: '1px dashed #334155', paddingBottom: '16px' }}>
                 <div className="form-group">
-                  <label className="form-label">Species</label>
+                  <label className="form-label">Species *</label>
                   <input className="glass-input" required value={line.species} onChange={e => updateLineItem(i, 'species', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Weight (KG)</label>
+                  <label className="form-label">Size *</label>
+                  <input className="glass-input" required value={line.size} onChange={e => updateLineItem(i, 'size', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Grade</label>
+                  <input className="glass-input" value={line.grade} onChange={e => updateLineItem(i, 'grade', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Condition</label>
+                  <input className="glass-input" value={line.condition} onChange={e => updateLineItem(i, 'condition', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Weight (KG) *</label>
                   <input type="number" step="0.01" className="glass-input" required value={line.weightKg} onChange={e => updateLineItem(i, 'weightKg', parseFloat(e.target.value))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Price / KG</label>
+                  <label className="form-label">Price / KG *</label>
                   <input type="number" className="glass-input" required value={line.pricePerKg} onChange={e => updateLineItem(i, 'pricePerKg', parseFloat(e.target.value))} />
                 </div>
-                <div style={{ paddingBottom: '24px' }}>
+                <div style={{ paddingBottom: '22px' }}>
                   <strong>= {(line.totalValue).toLocaleString()} IDR</strong>
                   <button type="button" onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} style={{ marginLeft: '16px', background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer' }}>Remove</button>
                 </div>
@@ -256,7 +289,7 @@ export const Purchases: React.FC = () => {
 
           <div style={{ marginTop: '24px', textAlign: 'right' }}>
             <h3 style={{ marginBottom: '16px' }}>Total: {lineItems.reduce((acc, curr) => acc + curr.totalValue, 0).toLocaleString()} IDR</h3>
-            <button type="submit" className="btn-primary" disabled={loading}>Save Purchase Record</button>
+            <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Uploading & Saving...' : 'Save Purchase Record'}</button>
           </div>
         </form>
       )}
@@ -271,6 +304,7 @@ export const Purchases: React.FC = () => {
               <th>Supplier</th>
               <th>Amount</th>
               <th>Payment</th>
+              <th>Photo</th>
             </tr>
           </thead>
           <tbody>
@@ -289,12 +323,13 @@ export const Purchases: React.FC = () => {
                       {p.paymentStatus}
                     </span>
                   </td>
+                  <td>{p.photoRef ? <a href={p.photoRef} target="_blank" rel="noreferrer">View</a> : '-'}</td>
                 </tr>
               );
             })}
             {purchases.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>No purchases found.</td>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>No purchases found.</td>
               </tr>
             )}
           </tbody>

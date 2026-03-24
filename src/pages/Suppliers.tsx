@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Supplier } from '../types';
 import { useAuth } from '../AuthContext';
+import { uploadFile } from '../uploadHelper';
 
 export const Suppliers: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -15,8 +16,8 @@ export const Suppliers: React.FC = () => {
   const [type, setType] = useState<'fisherman' | 'collector' | 'company' | 'service_provider'>('fisherman');
   const [nik, setNik] = useState('');
   const [npwp, setNpwp] = useState('');
-  const [village, setVillage] = useState('');
   const [island, setIsland] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const fetchSuppliers = async () => {
     setLoading(true);
@@ -54,6 +55,12 @@ export const Suppliers: React.FC = () => {
     }
 
     try {
+      setLoading(true);
+      let photoUrl = '';
+      if (photoFile) {
+        photoUrl = await uploadFile(photoFile, 'suppliers');
+      }
+
       const newSupplierData = {
         supplierId: `SUP-${Date.now()}`,
         name,
@@ -62,6 +69,7 @@ export const Suppliers: React.FC = () => {
         npwp: npwp || null,
         village: village || null,
         island: island || null,
+        photoRef: photoUrl || null,
         identityStatus: (!nik && !npwp) ? 'pending' : 'verified',
         isActive: true,
         createdAt: Timestamp.now(),
@@ -76,10 +84,13 @@ export const Suppliers: React.FC = () => {
       setNpwp('');
       setVillage('');
       setIsland('');
+      setPhotoFile(null);
       fetchSuppliers();
     } catch (e) {
       console.error(e);
       alert('Failed to save supplier.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,6 +136,10 @@ export const Suppliers: React.FC = () => {
                 <label className="form-label">Island</label>
                 <input className="glass-input" value={island} onChange={e => setIsland(e.target.value)} />
               </div>
+              <div className="form-group">
+                <label className="form-label">Identity Photo</label>
+                <input type="file" className="glass-input" onChange={e => setPhotoFile(e.target.files ? e.target.files[0] : null)} />
+              </div>
             </div>
             {!nik && !npwp && (
               <div style={{ color: 'var(--warning-color)', marginBottom: '16px', fontSize: '0.875rem' }}>
@@ -147,6 +162,7 @@ export const Suppliers: React.FC = () => {
                 <th>Name</th>
                 <th>Type</th>
                 <th>ID Status</th>
+                <th>Photo</th>
                 <th>Location</th>
                 <th>Status</th>
               </tr>
@@ -162,6 +178,7 @@ export const Suppliers: React.FC = () => {
                       {s.identityStatus}
                     </span>
                   </td>
+                  <td>{s.photoRef ? <a href={s.photoRef} target="_blank" rel="noreferrer">View</a> : '-'}</td>
                   <td>{s.village || '-'}, {s.island || '-'}</td>
                   <td>
                     <span className={`badge ${s.isActive ? 'badge-info' : 'badge-danger'}`}>

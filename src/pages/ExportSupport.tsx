@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ExportSupport, InventoryBatch } from '../types';
+import { uploadFile } from '../uploadHelper';
 
 export const ExportSupportView: React.FC = () => {
   const [exports, setExports] = useState<ExportSupport[]>([]);
@@ -11,23 +12,24 @@ export const ExportSupportView: React.FC = () => {
 
   // Form State
   const [saleRef, setSaleRef] = useState('');
-  const [commercialInvoiceRef, setCommercialInvoiceRef] = useState('');
-  const [packingListRef, setPackingListRef] = useState('');
-  const [pebRef, setPebRef] = useState('');
-  const [blRef, setBlRef] = useState('');
-  const [remittanceProofRef, setRemittanceProofRef] = useState('');
+  
+  const [ciFile, setCiFile] = useState<File | null>(null);
+  const [plFile, setPlFile] = useState<File | null>(null);
+  const [pebFile, setPebFile] = useState<File | null>(null);
+  const [blFile, setBlFile] = useState<File | null>(null);
+  const [remitFile, setRemitFile] = useState<File | null>(null);
+  
   const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const eSnap = await getDocs(collection(db, 'exportSupport'));
-      setExports(eSnap.docs.map(d => ({id: d.id, ...d.data()} as ExportSupport)));
-
-      const bSnap = await getDocs(collection(db, 'inventory'));
-      setBatches(bSnap.docs.map(d => ({id: d.id, ...d.data()} as InventoryBatch)));
+       const eSnap = await getDocs(collection(db, 'exportSupport'));
+       setExports(eSnap.docs.map(d => ({id: d.id, ...d.data()} as ExportSupport)));
+       const bSnap = await getDocs(collection(db, 'inventory'));
+       setBatches(bSnap.docs.map(d => ({id: d.id, ...d.data()} as InventoryBatch)));
     } finally {
-      setLoading(false);
+       setLoading(false);
     }
   };
 
@@ -39,8 +41,7 @@ export const ExportSupportView: React.FC = () => {
     e.preventDefault();
     if (!saleRef || selectedBatches.length === 0) return alert('Sale Ref and at least one linked Batch are required.');
 
-    // Rule: export record cannot be marked compliant without mandatory support set
-    const isComplete = Boolean(commercialInvoiceRef && packingListRef && pebRef && blRef && remittanceProofRef);
+    const isComplete = Boolean(ciFile && plFile && pebFile && blFile && remitFile);
     if (!isComplete) {
       const confirm = window.confirm('Missing supporting documents! Record will be saved as INCOMPLETE. Proceed?');
       if (!confirm) return;
@@ -48,6 +49,13 @@ export const ExportSupportView: React.FC = () => {
 
     try {
       setLoading(true);
+
+      const commercialInvoiceRef = ciFile ? await uploadFile(ciFile, 'exports') : '';
+      const packingListRef = plFile ? await uploadFile(plFile, 'exports') : '';
+      const pebRef = pebFile ? await uploadFile(pebFile, 'exports') : '';
+      const blRef = blFile ? await uploadFile(blFile, 'exports') : '';
+      const remittanceProofRef = remitFile ? await uploadFile(remitFile, 'exports') : '';
+
       await addDoc(collection(db, 'exportSupport'), {
         exportId: `EXP-${Date.now()}`,
         saleRef,
@@ -95,23 +103,23 @@ export const ExportSupportView: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Commercial Invoice Doc</label>
-              <input type="text" className="glass-input" value={commercialInvoiceRef} onChange={e => setCommercialInvoiceRef(e.target.value)} />
+              <input type="file" className="glass-input" onChange={e => setCiFile(e.target.files ? e.target.files[0] : null)} />
             </div>
             <div className="form-group">
               <label className="form-label">Packing List Doc</label>
-              <input type="text" className="glass-input" value={packingListRef} onChange={e => setPackingListRef(e.target.value)} />
+              <input type="file" className="glass-input" onChange={e => setPlFile(e.target.files ? e.target.files[0] : null)} />
             </div>
             <div className="form-group">
               <label className="form-label">PEB Ref</label>
-              <input type="text" className="glass-input" value={pebRef} onChange={e => setPebRef(e.target.value)} />
+              <input type="file" className="glass-input" onChange={e => setPebFile(e.target.files ? e.target.files[0] : null)} />
             </div>
             <div className="form-group">
               <label className="form-label">B/L (Bill of Lading)</label>
-              <input type="text" className="glass-input" value={blRef} onChange={e => setBlRef(e.target.value)} />
+              <input type="file" className="glass-input" onChange={e => setBlFile(e.target.files ? e.target.files[0] : null)} />
             </div>
             <div className="form-group">
               <label className="form-label">Remittance Proof</label>
-              <input type="text" className="glass-input" value={remittanceProofRef} onChange={e => setRemittanceProofRef(e.target.value)} />
+              <input type="file" className="glass-input" onChange={e => setRemitFile(e.target.files ? e.target.files[0] : null)} />
             </div>
           </div>
 

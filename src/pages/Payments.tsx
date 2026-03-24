@@ -3,6 +3,7 @@ import { collection, getDocs, addDoc, doc, updateDoc, writeBatch } from 'firebas
 import { db } from '../firebase';
 import { Payment, Purchase } from '../types';
 import { useAuth } from '../AuthContext';
+import { uploadFile } from '../uploadHelper';
 
 export const Payments: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -16,7 +17,7 @@ export const Payments: React.FC = () => {
   const [method, setMethod] = useState<'cash' | 'transfer'>('transfer');
   const [paymentRef, setPaymentRef] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
-  const [proofRef, setProofRef] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -40,11 +41,8 @@ export const Payments: React.FC = () => {
     if (!transactionId || !amount) return alert('Transaction ID and Amount are required.');
     
     // Enforce proof requirement rule
-    if (method === 'cash' && !proofRef) {
-      return alert('Cash acknowledgment proof is required before saving a cash payment.');
-    }
-    if (method === 'transfer' && !proofRef) {
-      return alert('Bank transfer proof is required before saving a transfer payment.');
+    if (!proofFile) {
+      return alert(`Upload proof is required before saving a ${method} payment.`);
     }
 
     const linkedPurchase = purchases.find(p => p.id === transactionId);
@@ -52,6 +50,9 @@ export const Payments: React.FC = () => {
 
     try {
       setLoading(true);
+      
+      const proofUrl = await uploadFile(proofFile, 'payments');
+
       const batchOp = writeBatch(db);
       
       const newPayRef = doc(collection(db, 'payments'));
@@ -64,7 +65,7 @@ export const Payments: React.FC = () => {
         date: new Date().toISOString(),
         approvedBy: profile?.uid || 'System',
         status: 'completed',
-        proofRef,
+        proofRef: proofUrl,
         createdAt: new Date().toISOString()
       });
 
@@ -126,8 +127,8 @@ export const Payments: React.FC = () => {
             </div>
           </div>
           <div className="form-group" style={{ marginTop: '16px' }}>
-            <label className="form-label">Proof / Document Ref (REQUIRED)</label>
-            <input type="text" className="glass-input" required placeholder="Path or ID to uploaded proof..." value={proofRef} onChange={e => setProofRef(e.target.value)} />
+            <label className="form-label">Proof Document (REQUIRED) *</label>
+            <input type="file" className="glass-input" required onChange={e => setProofFile(e.target.files ? e.target.files[0] : null)} />
             <small style={{ color: '#94a3b8' }}>System Rule: Payment impossible without linking evidence proof.</small>
           </div>
           
