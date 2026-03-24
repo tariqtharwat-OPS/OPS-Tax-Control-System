@@ -1,35 +1,54 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider } from './AuthContext';
+import { Sidebar } from './components/Sidebar';
+import { Topbar } from './components/Topbar';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+
+// Layout wrapper for authenticated pages
+const AppLayout = () => {
+  return (
+    <div className="app-container">
+      <Sidebar />
+      <div className="main-content">
+        <Topbar />
+        <Outlet />
+      </div>
+    </div>
+  );
+};
+
+import Suppliers from './pages/Suppliers';
+import Purchases from './pages/Purchases';
+import Inventory from './pages/Inventory';
+import Transfers from './pages/Transfers';
+import Payments from './pages/Payments';
+import ExportSupport from './pages/ExportSupport';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/transfers" element={<Transfers />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/export-support" element={<ExportSupport />} />
+          </Route>
+          
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
