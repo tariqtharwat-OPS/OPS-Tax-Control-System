@@ -1,0 +1,49 @@
+{
+  "status": "success",
+  "result": [
+    {
+      "projectId": "english4oman-76c4a",
+      "projectNumber": "75325189000",
+      "displayName": "English4Oman",
+      "name": "projects/english4oman-76c4a",
+      "resources": {
+        "hostingSite": "english4oman-76c4a"
+      },
+      "state": "ACTIVE",
+      "etag": "1_cda839ff-c046-4d21-9379-51365153bb49"
+    },
+    {
+      "projectId": "magicwords-4b86d",
+      "projectNumber": "216676450484",
+      "displayName": "MagicWords",
+      "name": "projects/magicwords-4b86d",
+      "resources": {
+        "hostingSite": "magicwords-4b86d"
+      },
+      "state": "ACTIVE",
+      "etag": "1_07b8fee9-fed0-4d04-bec9-0e55920ec9e1"
+    },
+    {
+      "projectId": "oceanpearl-ops",
+      "projectNumber": "784571080866",
+      "displayName": "oceanpearl-ops",
+      "name": "projects/oceanpearl-ops",
+      "resources": {
+        "hostingSite": "oceanpearl-ops"
+      },
+      "state": "ACTIVE",
+      "etag": "1_6dc19967-baea-4eff-b89d-8e2350b8c6f8"
+    },
+    {
+      "projectId": "ops-tax-crtl-sys-1792692677",
+      "projectNumber": "446431663009",
+      "displayName": "OPS Tax Control",
+      "name": "projects/ops-tax-crtl-sys-1792692677",
+      "resources": {
+        "hostingSite": "ops-tax-crtl-sys-1792692677"
+      },
+      "state": "ACTIVE",
+      "etag": "1_8d3a60ff-6498-43a0-82f9-35d0a0114687"
+    }
+  ]
+}
